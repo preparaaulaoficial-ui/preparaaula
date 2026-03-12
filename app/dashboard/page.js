@@ -68,6 +68,9 @@ export default function Dashboard() {
     estilo_turma: '',
     objetivos: '',
     recursos: [],
+    perfil_turma: '',
+    metodologia: '',
+    objetivo_aula: '',
   })
 
   useEffect(() => { carregarDados() }, [])
@@ -132,6 +135,9 @@ export default function Dashboard() {
           estilo_turma: form.estilo_turma,
           objetivos_adicionais: form.objetivos,
           recursos_disponiveis: form.recursos,
+          perfil_turma: form.perfil_turma,
+          metodologia: form.metodologia,
+          objetivo_aula: form.objetivo_aula,
           quantidade_slides: 14,
         })
       })
@@ -395,119 +401,192 @@ export default function Dashboard() {
           )}
 
           {/* Formulário */}
-          <div style={{background:'white',borderRadius:20,padding:26,border:'1px solid #e8eef8',marginBottom:24,boxShadow:'0 2px 12px rgba(21,38,100,0.05)'}}>
-            <div style={{marginBottom:18}}>
-              <h2 style={{fontSize:16,fontWeight:800,color:'#0f2b5b',margin:'0 0 3px'}}>✦ Nova aula com IA</h2>
-              <p style={{fontSize:13,color:'#94a3b8',margin:0}}>Descreva sua aula e deixe a IA fazer o resto.</p>
-            </div>
+          <div style={{background:'white',borderRadius:20,border:'1px solid #e8eef8',marginBottom:24,boxShadow:'0 2px 12px rgba(21,38,100,0.05)',overflow:'hidden'}}>
 
-            {/* Textarea principal */}
-            <div style={{marginBottom:14}}>
-              <label style={{fontSize:11,fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',color:'#94a3b8',display:'block',marginBottom:7}}>
-                DESCREVA SUA AULA
-              </label>
-              <textarea
-                placeholder="Ex: Sistema circulatório para o 8º ano, 50 minutos. Turma participativa, gosta de experimentos práticos..."
-                value={form.descricao}
-                onChange={e=>setForm({...form,descricao:e.target.value})}
-                rows={4}
-                style={{width:'100%',padding:'13px 15px',border:'1.5px solid #e2e8f0',borderRadius:12,fontSize:14,outline:'none',resize:'vertical',fontFamily:'sans-serif',color:'#374151',boxSizing:'border-box',lineHeight:1.6}}
-                onFocus={e=>e.target.style.borderColor='#1a56db'}
-                onBlur={e=>e.target.style.borderColor='#e2e8f0'}
-              />
-            </div>
-
-            {/* Selects */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:14}}>
-              <div>
-                <label style={{fontSize:12,fontWeight:600,color:'#374151',display:'block',marginBottom:5}}>Disciplina</label>
-                <select value={form.disciplina} onChange={e=>setForm({...form,disciplina:e.target.value})} style={sS}>
-                  <optgroup label="─ Ensino Básico ─">
-                    {DISCIPLINAS_BASICO.map(d=><option key={d}>{d}</option>)}
-                  </optgroup>
-                  <optgroup label="─ Ensino Superior ─">
-                    {DISCIPLINAS_SUPERIOR.map(d=><option key={d}>{d}</option>)}
-                  </optgroup>
-                </select>
-              </div>
-              <div>
-                <label style={{fontSize:12,fontWeight:600,color:'#374151',display:'block',marginBottom:5}}>Turma / Série</label>
-                <select value={form.turma} onChange={e=>setForm({...form,turma:e.target.value})} style={sS}>
-                  {TURMAS.map(g=>(
-                    <optgroup key={g.grupo} label={`─ ${g.grupo} ─`}>
-                      {g.opcoes.map(o=><option key={o}>{o}</option>)}
-                    </optgroup>
+            {/* Header do card */}
+            <div style={{padding:'20px 24px 0'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18}}>
+                <div>
+                  <h2 style={{fontSize:16,fontWeight:800,color:'#0f2b5b',margin:'0 0 2px'}}>✦ Nova aula com IA</h2>
+                  <p style={{fontSize:13,color:'#94a3b8',margin:0}}>Descreva sua aula e deixe a IA fazer o resto.</p>
+                </div>
+                <div style={{display:'flex',gap:6}}>
+                  {[{l:'Slides',i:'📊'},{l:'BNCC',i:'📋'},{l:'Roteiro',i:'🎙️'},{l:'Exercícios',i:'📝'}].map(c=>(
+                    <div key={c.l} style={{background:'#f0f4ff',color:'#1a56db',borderRadius:100,padding:'4px 10px',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',gap:4}}>
+                      {c.i} {c.l}
+                    </div>
                   ))}
-                </select>
+                </div>
               </div>
-              <div>
-                <label style={{fontSize:12,fontWeight:600,color:'#374151',display:'block',marginBottom:5}}>Duração</label>
-                <select value={form.duracao} onChange={e=>setForm({...form,duracao:e.target.value})} style={sS}>
-                  {DURACOES.map(d=><option key={d}>{d}</option>)}
-                </select>
-              </div>
-            </div>
 
-            {/* Campos extras */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
-              <div>
-                <label style={{fontSize:12,fontWeight:600,color:'#374151',display:'block',marginBottom:5}}>
-                  Estilo da turma <span style={{color:'#94a3b8',fontWeight:400}}>(opcional)</span>
+              {/* Tema da aula */}
+              <div style={{marginBottom:16}}>
+                <label style={{fontSize:11,fontWeight:700,letterSpacing:'0.09em',textTransform:'uppercase',color:'#152664',display:'block',marginBottom:7}}>
+                  📌 Tema da aula
                 </label>
-                <input
-                  type="text"
-                  placeholder='Ex: "turma tímida", "gostam de debates"'
-                  value={form.estilo_turma}
-                  onChange={e=>setForm({...form,estilo_turma:e.target.value})}
-                  style={{...sS,height:40}}
+                <textarea
+                  placeholder="Ex: Sistema circulatório para o 8º ano, 50 minutos. Turma participativa, gosta de experimentos práticos..."
+                  value={form.descricao}
+                  onChange={e=>setForm({...form,descricao:e.target.value})}
+                  rows={3}
+                  style={{width:'100%',padding:'13px 15px',border:'1.5px solid #e2e8f0',borderRadius:12,fontSize:14,outline:'none',resize:'none',fontFamily:'inherit',color:'#374151',boxSizing:'border-box',lineHeight:1.6,background:'white'}}
+                  onFocus={e=>e.target.style.borderColor='#1a56db'}
+                  onBlur={e=>e.target.style.borderColor='#e2e8f0'}
                 />
               </div>
-              <div>
-                <label style={{fontSize:12,fontWeight:600,color:'#374151',display:'block',marginBottom:5}}>
-                  Objetivos específicos <span style={{color:'#94a3b8',fontWeight:400}}>(opcional)</span>
+
+              {/* Selects */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:0}}>
+                <div>
+                  <label style={{fontSize:11,fontWeight:700,letterSpacing:'0.07em',textTransform:'uppercase',color:'#152664',display:'block',marginBottom:6}}>🎓 Disciplina</label>
+                  <select value={form.disciplina} onChange={e=>setForm({...form,disciplina:e.target.value})} style={sS}>
+                    <optgroup label="─ Ensino Básico ─">
+                      {DISCIPLINAS_BASICO.map(d=><option key={d}>{d}</option>)}
+                    </optgroup>
+                    <optgroup label="─ Ensino Superior ─">
+                      {DISCIPLINAS_SUPERIOR.map(d=><option key={d}>{d}</option>)}
+                    </optgroup>
+                  </select>
+                </div>
+                <div>
+                  <label style={{fontSize:11,fontWeight:700,letterSpacing:'0.07em',textTransform:'uppercase',color:'#152664',display:'block',marginBottom:6}}>👥 Turma / Série</label>
+                  <select value={form.turma} onChange={e=>setForm({...form,turma:e.target.value})} style={sS}>
+                    {TURMAS.map(g=>(
+                      <optgroup key={g.grupo} label={`─ ${g.grupo} ─`}>
+                        {g.opcoes.map(o=><option key={o}>{o}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{fontSize:11,fontWeight:700,letterSpacing:'0.07em',textTransform:'uppercase',color:'#152664',display:'block',marginBottom:6}}>⏱️ Duração</label>
+                  <select value={form.duracao} onChange={e=>setForm({...form,duracao:e.target.value})} style={sS}>
+                    {DURACOES.map(d=><option key={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Divisor com texto */}
+            <div style={{display:'flex',alignItems:'center',gap:12,padding:'18px 24px'}}>
+              <div style={{flex:1,height:1,background:'#f1f5f9'}}/>
+              <span style={{fontSize:11,fontWeight:700,color:'#94a3b8',letterSpacing:'0.08em',textTransform:'uppercase',whiteSpace:'nowrap'}}>
+                Personalizar aula
+              </span>
+              <div style={{flex:1,height:1,background:'#f1f5f9'}}/>
+            </div>
+
+            {/* Perguntas direcionadoras — grid de cards */}
+            <div style={{padding:'0 24px 20px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+
+              {/* Perfil da turma */}
+              <div style={{background:'#f8faff',borderRadius:14,padding:'14px 16px',border:'1px solid #eef2ff'}}>
+                <label style={{fontSize:11,fontWeight:700,color:'#152664',display:'block',marginBottom:10,letterSpacing:'0.06em',textTransform:'uppercase'}}>
+                  💬 Como é sua turma?
+                </label>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {['Participativa','Tímida','Agitada','Focada','Diversificada','Tem dificuldades'].map(o=>{
+                    const sel=form.perfil_turma===o
+                    return (
+                      <button key={o} onClick={()=>setForm({...form,perfil_turma:sel?'':o})}
+                        style={{padding:'5px 11px',borderRadius:100,fontSize:12,fontWeight:600,cursor:'pointer',border:sel?'1.5px solid #1a56db':'1.5px solid #dde4f0',background:sel?'#152664':'white',color:sel?'white':'#64748b',transition:'all 0.15s'}}>
+                        {o}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Metodologia */}
+              <div style={{background:'#f8faff',borderRadius:14,padding:'14px 16px',border:'1px solid #eef2ff'}}>
+                <label style={{fontSize:11,fontWeight:700,color:'#152664',display:'block',marginBottom:10,letterSpacing:'0.06em',textTransform:'uppercase'}}>
+                  🧪 Metodologia preferida?
+                </label>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {['Expositiva','Debate','Experimento','Gamificação','Trabalho em grupo','Resolução de problemas'].map(o=>{
+                    const sel=form.metodologia===o
+                    return (
+                      <button key={o} onClick={()=>setForm({...form,metodologia:sel?'':o})}
+                        style={{padding:'5px 11px',borderRadius:100,fontSize:12,fontWeight:600,cursor:'pointer',border:sel?'1.5px solid #1a56db':'1.5px solid #dde4f0',background:sel?'#152664':'white',color:sel?'white':'#64748b',transition:'all 0.15s'}}>
+                        {o}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Objetivo da aula */}
+              <div style={{background:'#f8faff',borderRadius:14,padding:'14px 16px',border:'1px solid #eef2ff'}}>
+                <label style={{fontSize:11,fontWeight:700,color:'#152664',display:'block',marginBottom:10,letterSpacing:'0.06em',textTransform:'uppercase'}}>
+                  🎯 Objetivo principal?
+                </label>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {['Introduzir o tema','Aprofundar conteúdo','Revisar para prova','Fixar aprendizado','Avaliar conhecimento'].map(o=>{
+                    const sel=form.objetivo_aula===o
+                    return (
+                      <button key={o} onClick={()=>setForm({...form,objetivo_aula:sel?'':o})}
+                        style={{padding:'5px 11px',borderRadius:100,fontSize:12,fontWeight:600,cursor:'pointer',border:sel?'1.5px solid #1a56db':'1.5px solid #dde4f0',background:sel?'#152664':'white',color:sel?'white':'#64748b',transition:'all 0.15s'}}>
+                        {o}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Recursos */}
+              <div style={{background:'#f8faff',borderRadius:14,padding:'14px 16px',border:'1px solid #eef2ff'}}>
+                <label style={{fontSize:11,fontWeight:700,color:'#152664',display:'block',marginBottom:10,letterSpacing:'0.06em',textTransform:'uppercase'}}>
+                  🖥️ Recursos disponíveis?
+                </label>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {['Projetor','Quadro branco','Laboratório','Computadores','Tablets','Só impresso'].map(r=>{
+                    const sel=form.recursos.includes(r)
+                    return (
+                      <button key={r} onClick={()=>setForm({...form,recursos:sel?form.recursos.filter(x=>x!==r):[...form.recursos,r]})}
+                        style={{padding:'5px 11px',borderRadius:100,fontSize:12,fontWeight:600,cursor:'pointer',border:sel?'1.5px solid #1a56db':'1.5px solid #dde4f0',background:sel?'#152664':'white',color:sel?'white':'#64748b',transition:'all 0.15s'}}>
+                        {r}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Habilidade BNCC */}
+              <div style={{background:'#f8faff',borderRadius:14,padding:'14px 16px',border:'1px solid #eef2ff'}}>
+                <label style={{fontSize:11,fontWeight:700,color:'#152664',display:'block',marginBottom:8,letterSpacing:'0.06em',textTransform:'uppercase'}}>
+                  📌 Habilidade BNCC <span style={{color:'#94a3b8',fontWeight:400,textTransform:'none',fontSize:11}}>(opcional)</span>
                 </label>
                 <input
                   type="text"
-                  placeholder='Ex: "preparar para prova", "habilidade EF08CI08"'
+                  placeholder="Ex: EF08CI08, EM13CNT101..."
                   value={form.objetivos}
                   onChange={e=>setForm({...form,objetivos:e.target.value})}
-                  style={{...sS,height:40}}
+                  style={{...sS,background:'white',height:38}}
+                />
+              </div>
+
+              {/* Observações livres */}
+              <div style={{background:'#f8faff',borderRadius:14,padding:'14px 16px',border:'1px solid #eef2ff'}}>
+                <label style={{fontSize:11,fontWeight:700,color:'#152664',display:'block',marginBottom:8,letterSpacing:'0.06em',textTransform:'uppercase'}}>
+                  💡 Observações extras <span style={{color:'#94a3b8',fontWeight:400,textTransform:'none',fontSize:11}}>(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder='Ex: "incluir curiosidade histórica", "usar exemplos do cotidiano"'
+                  value={form.estilo_turma}
+                  onChange={e=>setForm({...form,estilo_turma:e.target.value})}
+                  style={{...sS,background:'white',height:38}}
                 />
               </div>
             </div>
 
-            {/* Recursos disponíveis */}
-            <div style={{marginBottom:20}}>
-              <label style={{fontSize:12,fontWeight:600,color:'#374151',display:'block',marginBottom:8}}>
-                Recursos disponíveis <span style={{color:'#94a3b8',fontWeight:400}}>(selecione os que tem)</span>
-              </label>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                {['Projetor','Quadro branco','Laboratório','Computadores','Tablets','Material impresso','Sem recursos especiais'].map(r=>{
-                  const sel = form.recursos.includes(r)
-                  return (
-                    <button key={r}
-                      onClick={()=>setForm({...form,recursos:sel?form.recursos.filter(x=>x!==r):[...form.recursos,r]})}
-                      style={{
-                        padding:'6px 14px',borderRadius:100,fontSize:12,fontWeight:600,cursor:'pointer',
-                        border: sel?'1.5px solid #1a56db':'1.5px solid #e2e8f0',
-                        background: sel?'#eff6ff':'white',
-                        color: sel?'#1a56db':'#64748b',
-                        transition:'all 0.15s'
-                      }}
-                    >{r}</button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Chips + botão */}
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
-              <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
-                {[{l:'Slides',i:'📊'},{l:'Plano BNCC',i:'📋'},{l:'Roteiro',i:'🎙️'},{l:'Exercícios',i:'📝'}].map(c=>(
-                  <div key={c.l} style={{background:'#f0f4ff',color:'#1a56db',borderRadius:100,padding:'5px 12px',fontSize:12,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
-                    {c.i} {c.l}
-                  </div>
-                ))}
+            {/* Footer do card — botão */}
+            <div style={{padding:'16px 24px',background:'#f8faff',borderTop:'1px solid #eef2ff',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div style={{fontSize:12,color:'#94a3b8'}}>
+                {[form.perfil_turma,form.metodologia,form.objetivo_aula,...form.recursos].filter(Boolean).length > 0
+                  ? <span style={{color:'#10b981',fontWeight:600}}>✓ {[form.perfil_turma,form.metodologia,form.objetivo_aula,...form.recursos].filter(Boolean).length} preferências selecionadas</span>
+                  : 'Selecione preferências para uma aula mais personalizada'
+                }
               </div>
               <button
                 onClick={handleGerarAula}
@@ -526,7 +605,7 @@ export default function Dashboard() {
 
             {/* Progresso */}
             {gerando && (
-              <div style={{marginTop:18}}>
+              <div style={{padding:'0 24px 20px'}}>
                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:7}}>
                   <span style={{fontSize:13,color:'#64748b'}}>
                     {progresso<30?'🤖 Analisando contexto...':progresso<60?'📊 Criando slides...':progresso<85?'📋 Montando plano...':'✅ Finalizando...'}
