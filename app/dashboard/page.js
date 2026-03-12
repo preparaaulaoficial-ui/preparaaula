@@ -1,534 +1,911 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
-export default function DashboardPage() {
+const DISCIPLINAS = [
+  // Ensino Básico
+  'Matemática', 'Português', 'Ciências', 'História', 'Geografia',
+  'Física', 'Química', 'Biologia', 'Inglês', 'Espanhol',
+  'Artes', 'Educação Física', 'Filosofia', 'Sociologia', 'Religião',
+  // Ensino Superior
+  'Administração', 'Contabilidade', 'Direito', 'Economia',
+  'Engenharia', 'Medicina', 'Psicologia', 'Pedagogia',
+  'Nutrição', 'Arquitetura', 'Tecnologia da Informação',
+  'Comunicação', 'Letras', 'Enfermagem', 'Fisioterapia',
+]
+
+const TURMAS = [
+  // Educação Infantil
+  { grupo: 'Educação Infantil', opcoes: ['Maternal', 'Jardim I', 'Jardim II', 'Pré-escola'] },
+  // Ensino Fundamental I
+  { grupo: 'Fund. I', opcoes: ['1º ano — EF', '2º ano — EF', '3º ano — EF', '4º ano — EF', '5º ano — EF'] },
+  // Ensino Fundamental II
+  { grupo: 'Fund. II', opcoes: ['6º ano — EF', '7º ano — EF', '8º ano — EF', '9º ano — EF'] },
+  // Ensino Médio
+  { grupo: 'Ensino Médio', opcoes: ['1º ano — EM', '2º ano — EM', '3º ano — EM'] },
+  // EJA
+  { grupo: 'EJA', opcoes: ['EJA — Fase I', 'EJA — Fase II', 'EJA — Fase III'] },
+  // Ensino Superior
+  {
+    grupo: 'Ensino Superior', opcoes: [
+      'Superior — 1º Período', 'Superior — 2º Período', 'Superior — 3º Período',
+      'Superior — 4º Período', 'Superior — 5º Período', 'Superior — 6º Período',
+      'Superior — 7º Período', 'Superior — 8º Período',
+      'Pós-graduação', 'Mestrado', 'Doutorado',
+    ]
+  },
+  // Técnico
+  { grupo: 'Técnico', opcoes: ['Técnico — Módulo I', 'Técnico — Módulo II', 'Técnico — Módulo III'] },
+]
+
+const DURACOES = ['20 minutos', '30 minutos', '40 minutos', '50 minutos', '1 hora', '1h30', '2 horas']
+
+const navItems = [
+  { id: 'inicio', label: 'Início', icon: '⊞' },
+  { id: 'nova-aula', label: 'Nova Aula', icon: '✦', badge: 'IA' },
+  { id: 'minhas-aulas', label: 'Minhas Aulas', icon: '⊡' },
+  { id: 'slides', label: 'Slides', icon: '▤', section: 'FERRAMENTAS' },
+  { id: 'planos-aula', label: 'Planos de Aula', icon: '☰' },
+  { id: 'exercicios', label: 'Exercícios', icon: '✎' },
+  { id: 'roteiros', label: 'Roteiros', icon: '⚑' },
+  { id: 'plano', label: 'Plano & Assinatura', icon: '⊕', section: 'CONTA' },
+  { id: 'sair', label: 'Sair', icon: '⎋' },
+]
+
+export default function Dashboard() {
   const router = useRouter()
-  const [user, setUser]           = useState(null)
-  const [profile, setProfile]     = useState(null)
-  const [prompt, setPrompt]       = useState('')
-  const [disciplina, setDisciplina] = useState('Ciências')
-  const [turma, setTurma]         = useState('8º ano — EF')
-  const [duracao, setDuracao]     = useState('50 minutos')
-  const [genModal, setGenModal]   = useState(false)
-  const [activeStep, setActiveStep] = useState(-1)
-  const [doneSteps, setDoneSteps] = useState([])
-  const [progress, setProgress]   = useState(0)
-  const [genDone, setGenDone]     = useState(false)
-  const [filter, setFilter]       = useState('Todas')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const timerRef = useRef(null)
+  const [usuario, setUsuario] = useState(null)
+  const [aulas, setAulas] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [gerando, setGerando] = useState(false)
+  const [progresso, setProgresso] = useState(0)
+  const [activeNav, setActiveNav] = useState('inicio')
+  const [filtro, setFiltro] = useState('todas')
+  const [busca, setBusca] = useState('')
 
-  const STEPS = [
-    {icon:'🧠', label:'Analisando tema e contexto pedagógico'},
-    {icon:'📊', label:'Gerando estrutura dos slides'},
-    {icon:'📋', label:'Criando plano de aula e alinhamento BNCC'},
-    {icon:'🎙️', label:'Elaborando roteiro do professor'},
-    {icon:'📝', label:'Criando exercícios com gabarito'},
-  ]
-  const DURATIONS = [600, 900, 800, 700, 800]
+  const [form, setForm] = useState({
+    descricao: '',
+    disciplina: 'Ciências',
+    turma: '8º ano — EF',
+    duracao: '50 minutos',
+  })
 
-  useEffect(() => {
-    loadUser()
-  }, [])
+  // Stats calculados a partir dos dados reais
+  const [stats, setStats] = useState({
+    aulasMes: 0,
+    slidesGerados: 0,
+    horasEconomizadas: 0,
+    exerciciosGerados: 0,
+    limitesMes: 20,
+    aulasUsadas: 0,
+  })
 
-  async function loadUser() {
+  useEffect(() => { carregarDados() }, [])
+
+  async function carregarDados() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
-    setUser(user)
-    const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    if (prof && !prof.plano_ativo) { router.push('/planos'); return }
-    setProfile(prof)
+
+    const { data: perfil } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (!perfil?.plano_ativo) { router.push('/planos'); return }
+
+    setUsuario(perfil)
+
+    const { data: minhasAulas } = await supabase
+      .from('aulas')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    const lista = minhasAulas || []
+    setAulas(lista)
+
+    // Calcular stats a partir dos dados reais
+    const mesAtual = new Date().toISOString().slice(0, 7) // "2026-03"
+    const aulasMes = lista.filter(a => a.created_at?.slice(0, 7) === mesAtual).length
+
+    let totalSlides = 0
+    let totalExercicios = 0
+    for (const aula of lista) {
+      try {
+        const slides = aula.slides ? JSON.parse(aula.slides) : []
+        totalSlides += Array.isArray(slides) ? slides.length : 0
+      } catch {}
+      try {
+        const ex = aula.exercicios ? JSON.parse(aula.exercicios) : []
+        totalExercicios += Array.isArray(ex) ? ex.length : 0
+      } catch {}
+    }
+
+    const limites = { starter: 20, profissional: 35, escola: 60 }
+    const limite = limites[perfil?.plano] || 20
+
+    setStats({
+      aulasMes,
+      slidesGerados: totalSlides,
+      horasEconomizadas: Math.round(lista.length * 1.5),
+      exerciciosGerados: totalExercicios,
+      limitesMes: limite,
+      aulasUsadas: perfil?.aulas_mes || 0,
+    })
+
+    setLoading(false)
   }
 
-  function openGenModal() {
-    setGenModal(true)
-    setActiveStep(-1)
-    setDoneSteps([])
-    setProgress(0)
-    setGenDone(false)
-    runStep(0)
-  }
-
-  function runStep(idx) {
-    if (idx >= STEPS.length) {
-      setActiveStep(-1)
-      setProgress(100)
-      setGenDone(true)
-      timerRef.current = setTimeout(() => setGenModal(false), 1800)
+  async function handleGerarAula() {
+    if (!form.descricao.trim()) {
+      alert('Descreva sua aula antes de gerar!')
       return
     }
-    setActiveStep(idx)
-    setProgress(Math.round(((idx + 0.5) / STEPS.length) * 100))
-    timerRef.current = setTimeout(() => {
-      setDoneSteps(d => [...d, idx])
-      runStep(idx + 1)
-    }, DURATIONS[idx])
+
+    const limite = stats.limitesMes
+    const usadas = stats.aulasUsadas
+    if (usadas >= limite) {
+      alert(`Você atingiu o limite de ${limite} aulas do seu plano este mês. Faça upgrade para continuar!`)
+      return
+    }
+
+    setGerando(true)
+    setProgresso(0)
+    setActiveNav('nova-aula')
+
+    // Progresso animado
+    const intervalo = setInterval(() => {
+      setProgresso(p => {
+        if (p >= 85) { clearInterval(intervalo); return p }
+        return p + Math.random() * 8
+      })
+    }, 800)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      const response = await fetch('/api/gerar-aula', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          tema: form.descricao,
+          disciplina: form.disciplina,
+          nivel: form.turma,
+          duracao: form.duracao,
+          turma: form.turma,
+          quantidade_slides: 14,
+        })
+      })
+
+      clearInterval(intervalo)
+      setProgresso(100)
+
+      const data = await response.json()
+
+      if (!response.ok || data.erro) {
+        alert('Erro ao gerar aula: ' + (data.erro || 'Tente novamente'))
+        setGerando(false)
+        setProgresso(0)
+        return
+      }
+
+      // Redireciona para a aula gerada
+      setTimeout(() => {
+        setGerando(false)
+        setProgresso(0)
+        if (data.aula?.id) {
+          router.push(`/aula/${data.aula.id}`)
+        } else {
+          carregarDados()
+          setActiveNav('minhas-aulas')
+        }
+      }, 600)
+
+    } catch (err) {
+      clearInterval(intervalo)
+      alert('Erro de conexão. Verifique sua internet e tente novamente.')
+      setGerando(false)
+      setProgresso(0)
+    }
   }
 
-  useEffect(() => () => clearTimeout(timerRef.current), [])
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
-  const nomeUsuario = profile?.nome || user?.email?.split('@')[0] || 'Professor'
-  const iniciais    = nomeUsuario.split(' ').slice(0,2).map(n => n[0]).join('').toUpperCase()
-  const planoNome   = profile?.plano ? profile.plano.charAt(0).toUpperCase() + profile.plano.slice(1) : 'Starter'
-  const aulasUsadas = profile?.aulas_mes || 0
-  const aulasTotal  = profile?.plano === 'profissional' ? 35 : profile?.plano === 'escola' ? 60 : 20
+  const aulasFiltradas = aulas.filter(a => {
+    if (filtro === 'concluidas') return a.status === 'concluida' || !a.status
+    if (filtro === 'rascunhos') return a.status === 'rascunho'
+    return true
+  }).filter(a => {
+    if (!busca) return true
+    const s = busca.toLowerCase()
+    return (a.titulo || a.tema || '').toLowerCase().includes(s) ||
+      (a.disciplina || '').toLowerCase().includes(s)
+  })
 
-  const aulas = [
-    {icon:'🌿',bg:'#DCFCE7',nome:'Fotossíntese',info:'Ciências · 7º ano · 50 min',status:'done',slides:'18 slides',data:'Hoje, 09:14'},
-    {icon:'📜',bg:'#FEF9C3',nome:'Revolução Industrial',info:'História · 9º ano · 50 min',status:'editing',slides:'20 slides',data:'Ontem, 15:32'},
-    {icon:'🔢',bg:'#cbe7fe',nome:'Equações do 2º Grau',info:'Matemática · 8º ano · 50 min',status:'done',slides:'16 slides',data:'10/03, 11:05'},
-    {icon:'📖',bg:'#FFF7ED',nome:'Gêneros Textuais',info:'Português · 6º ano · 45 min',status:'draft',slides:'12 slides',data:'09/03, 08:50'},
-    {icon:'🌍',bg:'#F0FDF4',nome:'Biomas Brasileiros',info:'Geografia · 7º ano · 50 min',status:'done',slides:'19 slides',data:'07/03, 14:22'},
-  ]
+  const iconesDisciplina = {
+    'Ciências': '🔬', 'Matemática': '📐', 'Português': '📝', 'História': '🏛️',
+    'Geografia': '🌍', 'Física': '⚡', 'Química': '🧪', 'Biologia': '🧬',
+    'Inglês': '🇺🇸', 'Espanhol': '🇪🇸', 'Artes': '🎨', 'Educação Física': '⚽',
+    'Filosofia': '🦉', 'Sociologia': '👥', 'Direito': '⚖️', 'Medicina': '🩺',
+    'Engenharia': '⚙️', 'Administração': '📊', 'Psicologia': '🧠',
+  }
 
-  const aulasFiltradas = filter === 'Todas' ? aulas
-    : filter === 'Concluídas' ? aulas.filter(a => a.status === 'done')
-    : aulas.filter(a => a.status === 'draft')
+  const getHoraSaudacao = () => {
+    const h = new Date().getHours()
+    if (h < 12) return 'Bom dia'
+    if (h < 18) return 'Boa tarde'
+    return 'Boa noite'
+  }
 
-  return (
-    <div style={{fontFamily:"'Inter',sans-serif",height:'100vh',overflow:'hidden',background:'#F8FAFC'}}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-        :root{
-          --indigo:#152664;--indigo-light:#1e3580;--indigo-50:#cbe7fe;--indigo-100:#a8d8fd;
-          --violet:#152664;--violet-light:#1e3580;--peach:#f4e3d0;
-          --slate-900:#0F172A;--slate-800:#1E293B;--slate-700:#334155;
-          --slate-600:#475569;--slate-500:#64748B;--slate-400:#94A3B8;
-          --slate-300:#CBD5E1;--slate-200:#E2E8F0;--slate-100:#F1F5F9;--slate-50:#F8FAFC;
-          --white:#FFFFFF;--success:#10B981;--success-bg:#ECFDF5;--success-border:#A7F3D0;
-          --amber:#F59E0B;--amber-bg:#FFFBEB;--danger:#EF4444;--danger-bg:#FEF2F2;
-          --sidebar-w:248px;--topbar-h:64px;--radius:12px;--radius-lg:18px;--radius-xl:22px;
-          --shadow-sm:0 1px 3px rgba(0,0,0,.05);
-          --shadow:0 4px 16px rgba(0,0,0,.07),0 2px 6px rgba(0,0,0,.04);
-          --shadow-lg:0 12px 40px rgba(15,23,42,.1),0 4px 12px rgba(15,23,42,.06);
-          --shadow-indigo:0 6px 24px rgba(21,38,100,.3);
-          --transition:all .2s cubic-bezier(.4,0,.2,1);
-        }
-        html{-webkit-font-smoothing:antialiased;}
-        body{font-family:'Inter',sans-serif;color:var(--slate-900);background:var(--slate-50);}
-        a{color:inherit;text-decoration:none;}
-        button{font-family:inherit;cursor:pointer;border:none;}
-        ::-webkit-scrollbar{width:5px;height:5px;}
-        ::-webkit-scrollbar-track{background:transparent;}
-        ::-webkit-scrollbar-thumb{background:var(--slate-200);border-radius:99px;}
+  const formatarData = (iso) => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    const hoje = new Date()
+    const ontem = new Date(); ontem.setDate(ontem.getDate() - 1)
+    if (d.toDateString() === hoje.toDateString()) return `Hoje, ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+    if (d.toDateString() === ontem.toDateString()) return `Ontem, ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ', ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  }
 
-        .app{display:flex;height:100vh;overflow:hidden;}
+  const nomeAbreviado = usuario?.nome?.split(' ')[0] || 'Professor'
+  const iniciais = usuario?.nome?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || 'GC'
+  const nomePlano = { starter: 'Starter', profissional: 'Profissional', escola: 'Escola' }[usuario?.plano] || 'Starter'
 
-        /* SIDEBAR */
-        .sidebar{width:var(--sidebar-w);flex-shrink:0;background:#152664;display:flex;flex-direction:column;height:100vh;overflow:hidden;position:relative;z-index:50;}
-        .sidebar::before{content:'';position:absolute;top:0;left:0;right:0;height:220px;background:linear-gradient(180deg,rgba(244,227,208,.08) 0%,transparent 100%);pointer-events:none;}
-        .sidebar-logo{display:flex;align-items:center;gap:10px;padding:22px 20px 20px;font-weight:800;font-size:1.05rem;color:#fff;position:relative;z-index:1;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:8px;}
-        .sidebar-logo-mark{width:32px;height:32px;border-radius:9px;flex-shrink:0;background:linear-gradient(135deg,var(--indigo),var(--violet));display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:var(--shadow-indigo);}
-        .sidebar-section-label{font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.25);padding:12px 20px 6px;}
-        .sidebar-nav{flex:1;overflow-y:auto;padding:4px 10px;}
-        .nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font-size:.875rem;font-weight:500;color:rgba(255,255,255,.55);cursor:pointer;transition:var(--transition);position:relative;user-select:none;margin-bottom:2px;}
-        .nav-item:hover{background:rgba(255,255,255,.07);color:rgba(255,255,255,.88);}
-        .nav-item.active{background:rgba(21,38,100,.3);color:#fff;font-weight:600;}
-        .nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:18px;background:var(--indigo-light);border-radius:0 3px 3px 0;}
-        .nav-icon{font-size:1rem;flex-shrink:0;width:20px;text-align:center;}
-        .nav-badge{margin-left:auto;background:var(--peach);color:var(--indigo);font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:99px;}
-        .sidebar-divider{height:1px;background:rgba(255,255,255,.07);margin:10px 16px;}
-        .sidebar-bottom{padding:14px 10px;border-top:1px solid rgba(255,255,255,.07);}
-        .user-chip{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;cursor:pointer;transition:var(--transition);}
-        .user-chip:hover{background:rgba(255,255,255,.07);}
-        .user-avatar{width:34px;height:34px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,var(--indigo),var(--violet-light));display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:white;}
-        .user-name{font-size:.82rem;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-        .user-plan{font-size:.7rem;color:rgba(255,255,255,.38);}
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: '#f0f4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 16, animation: 'spin 1s linear infinite' }}>✦</div>
+        <p style={{ color: '#1a3a7a', fontWeight: 600 }}>Carregando PreparaAula...</p>
+        <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
+      </div>
+    </div>
+  )
 
-        /* MAIN */
-        .main-col{flex:1;display:flex;flex-direction:column;overflow:hidden;}
-        .topbar{height:var(--topbar-h);background:var(--white);border-bottom:1px solid var(--slate-100);display:flex;align-items:center;padding:0 28px;gap:16px;flex-shrink:0;position:relative;z-index:10;}
-        .topbar-title{font-size:1rem;font-weight:700;color:var(--slate-900);}
-        .search-wrap{display:flex;align-items:center;gap:9px;background:var(--slate-50);border:1.5px solid var(--slate-100);border-radius:10px;padding:0 14px;height:38px;flex:1;max-width:320px;transition:var(--transition);}
-        .search-wrap:focus-within{border-color:var(--indigo);background:var(--white);box-shadow:0 0 0 3px rgba(21,38,100,.09);}
-        .search-input{border:none;outline:none;background:transparent;font-family:'Inter',sans-serif;font-size:.875rem;color:var(--slate-900);flex:1;}
-        .search-input::placeholder{color:var(--slate-400);}
-        .topbar-spacer{flex:1;}
-        .topbar-actions{display:flex;align-items:center;gap:8px;}
-        .icon-btn{width:38px;height:38px;border-radius:10px;background:transparent;display:flex;align-items:center;justify-content:center;color:var(--slate-500);transition:var(--transition);position:relative;}
-        .icon-btn:hover{background:var(--slate-100);color:var(--slate-700);}
-        .notif-dot{position:absolute;top:8px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--danger);border:1.5px solid var(--white);}
-        .topbar-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--indigo),var(--violet-light));display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:white;cursor:pointer;border:2px solid var(--indigo-100);}
-        .page-content{flex:1;overflow-y:auto;padding:32px 32px 48px;display:flex;flex-direction:column;gap:28px;}
-        .welcome-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;}
-        .welcome-text h1{font-size:1.45rem;font-weight:800;letter-spacing:-.02em;color:var(--slate-900);margin-bottom:5px;}
-        .welcome-text p{font-size:.875rem;color:var(--slate-500);}
-        .btn-new-lesson{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:var(--radius);background:linear-gradient(135deg,var(--indigo),var(--violet));color:#fff;font-size:.875rem;font-weight:700;box-shadow:var(--shadow-indigo);transition:var(--transition);flex-shrink:0;}
-        .btn-new-lesson:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(21,38,100,.38);filter:brightness(1.06);}
-        .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
-        .stat-card{background:var(--white);border:1.5px solid var(--slate-100);border-radius:var(--radius-lg);padding:22px 24px;transition:var(--transition);}
-        .stat-card:hover{box-shadow:var(--shadow);border-color:var(--slate-200);}
-        .stat-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;}
-        .stat-icon{width:40px;height:40px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;}
-        .si-indigo{background:var(--indigo-50);}.si-violet{background:#F5F3FF;}.si-green{background:var(--success-bg);}.si-amber{background:var(--amber-bg);}
-        .stat-trend{font-size:.72rem;font-weight:600;padding:3px 8px;border-radius:99px;display:flex;align-items:center;gap:3px;}
-        .trend-up{background:var(--success-bg);color:var(--success);}.trend-same{background:var(--slate-100);color:var(--slate-500);}
-        .stat-value{font-size:1.9rem;font-weight:900;letter-spacing:-.03em;color:var(--slate-900);margin-bottom:4px;}
-        .stat-label{font-size:.8rem;color:var(--slate-500);font-weight:500;}
-        .two-col{display:grid;grid-template-columns:1fr 360px;gap:20px;}
-        .create-card{background:var(--white);border:1.5px solid var(--slate-100);border-radius:var(--radius-xl);overflow:hidden;}
-        .create-card-head{padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;}
-        .create-card-head h2{font-size:1rem;font-weight:700;}
-        .create-card-head p{font-size:.8rem;color:var(--slate-500);margin-top:3px;}
-        .create-body{padding:20px 24px 24px;display:flex;flex-direction:column;gap:14px;}
-        .prompt-area{border:1.5px solid var(--slate-200);border-radius:var(--radius);padding:14px 16px;background:var(--slate-50);transition:var(--transition);position:relative;}
-        .prompt-area:focus-within{border-color:var(--indigo);background:var(--white);box-shadow:0 0 0 3px rgba(21,38,100,.09);}
-        .prompt-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--indigo);margin-bottom:8px;}
-        .prompt-textarea{width:100%;border:none;outline:none;resize:none;background:transparent;font-family:'Inter',sans-serif;font-size:.9rem;color:var(--slate-800);line-height:1.6;min-height:72px;}
-        .prompt-textarea::placeholder{color:var(--slate-400);}
-        .create-options{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
-        .create-opt-label{font-size:.78rem;font-weight:600;color:var(--slate-700);margin-bottom:5px;}
-        .create-opt-select{width:100%;height:38px;padding:0 28px 0 10px;border:1.5px solid var(--slate-200);border-radius:8px;background:#fff;font-family:'Inter',sans-serif;font-size:.82rem;color:var(--slate-700);outline:none;cursor:pointer;transition:border-color .18s;appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394A3B8' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;}
-        .create-opt-select:focus{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(21,38,100,.09);}
-        .create-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
-        .create-chips{display:flex;gap:8px;flex-wrap:wrap;}
-        .chip{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:99px;font-size:.72rem;font-weight:600;border:1.5px solid transparent;cursor:pointer;transition:var(--transition);}
-        .chip-outline{border-color:var(--slate-200);color:var(--slate-600);background:var(--white);}
-        .chip-outline:hover{border-color:var(--indigo);color:var(--indigo);}
-        .chip-filled{background:var(--indigo-50);border-color:var(--indigo-100);color:var(--indigo);}
-        .btn-generate{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:var(--radius);background:linear-gradient(135deg,var(--indigo),var(--violet));color:#fff;font-size:.875rem;font-weight:700;box-shadow:var(--shadow-indigo);transition:var(--transition);}
-        .btn-generate:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(21,38,100,.38);filter:brightness(1.06);}
-        .info-card{background:var(--white);border:1.5px solid var(--slate-100);border-radius:var(--radius-xl);padding:22px;display:flex;flex-direction:column;}
-        .info-card-head{margin-bottom:18px;}
-        .info-card-head h2{font-size:.9375rem;font-weight:700;margin-bottom:3px;}
-        .info-card-head p{font-size:.78rem;color:var(--slate-500);}
-        .plan-usage{margin-bottom:20px;}
-        .usage-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-        .usage-label{font-size:.8rem;font-weight:600;color:var(--slate-700);}
-        .usage-count{font-size:.8rem;color:var(--slate-500);}
-        .usage-count strong{color:var(--slate-900);}
-        .usage-bar{height:7px;background:var(--slate-100);border-radius:99px;overflow:hidden;}
-        .usage-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--indigo),var(--violet));transition:width .6s cubic-bezier(.22,1,.36,1);}
-        .plan-chip-row{display:flex;align-items:center;justify-content:space-between;}
-        .plan-name-chip{font-size:.75rem;font-weight:700;padding:4px 12px;border-radius:99px;background:var(--peach);color:var(--indigo);}
-        .plan-upgrade{font-size:.78rem;font-weight:600;color:var(--indigo);}
-        .plan-upgrade:hover{text-decoration:underline;}
-        .info-divider{height:1px;background:var(--slate-100);margin:18px 0;}
-        .tips-list{display:flex;flex-direction:column;gap:12px;}
-        .tip-item{display:flex;align-items:flex-start;gap:10px;}
-        .tip-icon{width:30px;height:30px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;}
-        .ti-blue{background:var(--indigo-50);}.ti-green{background:var(--success-bg);}.ti-amber{background:var(--amber-bg);}
-        .tip-text strong{display:block;font-size:.78rem;font-weight:700;color:var(--slate-800);margin-bottom:1px;}
-        .tip-text span{font-size:.72rem;color:var(--slate-500);line-height:1.4;}
-        .lessons-card{background:var(--white);border:1.5px solid var(--slate-100);border-radius:var(--radius-xl);overflow:hidden;}
-        .lessons-head{padding:20px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--slate-100);}
-        .lessons-head h2{font-size:.9375rem;font-weight:700;}
-        .lessons-filters{display:flex;align-items:center;gap:8px;}
-        .filter-btn{padding:6px 14px;border-radius:99px;font-size:.775rem;font-weight:600;background:transparent;color:var(--slate-500);transition:var(--transition);}
-        .filter-btn:hover{background:var(--slate-100);color:var(--slate-700);}
-        .filter-btn.active{background:var(--indigo-50);color:var(--indigo);}
-        .lessons-table{width:100%;border-collapse:collapse;}
-        .lessons-table th{padding:11px 20px;text-align:left;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--slate-400);background:var(--slate-50);border-bottom:1px solid var(--slate-100);}
-        .lessons-table th:first-child{padding-left:24px;}
-        .lessons-table th:last-child{padding-right:24px;text-align:right;}
-        .lessons-table td{padding:14px 20px;font-size:.875rem;color:var(--slate-700);border-bottom:1px solid var(--slate-50);vertical-align:middle;}
-        .lessons-table td:first-child{padding-left:24px;}
-        .lessons-table td:last-child{padding-right:24px;text-align:right;}
-        .lessons-table tr:last-child td{border-bottom:none;}
-        .lessons-table tr:hover td{background:var(--slate-50);}
-        .lesson-subject{display:flex;align-items:center;gap:12px;}
-        .lesson-icon{width:36px;height:36px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;}
-        .lesson-name{font-size:.875rem;font-weight:600;color:var(--slate-900);}
-        .lesson-grade{font-size:.75rem;color:var(--slate-500);margin-top:1px;}
-        .badge-status{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:600;padding:4px 10px;border-radius:99px;}
-        .bs-done{background:var(--success-bg);color:var(--success);}
-        .bs-editing{background:var(--indigo-50);color:var(--indigo);}
-        .bs-draft{background:var(--slate-100);color:var(--slate-500);}
-        .lesson-meta{font-size:.78rem;color:var(--slate-400);}
-        .row-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;}
-        .row-btn{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--slate-400);transition:var(--transition);background:transparent;}
-        .row-btn:hover{background:var(--slate-100);color:var(--slate-700);}
-        .lessons-footer{padding:14px 24px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--slate-100);font-size:.78rem;color:var(--slate-400);}
-        .btn-see-all{font-size:.78rem;font-weight:600;color:var(--indigo);background:none;transition:color .15s;}
-        .btn-see-all:hover{color:#0d1b52;}
-        .mobile-sidebar-toggle{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:var(--slate-100);color:var(--slate-700);}
-
-        /* GEN MODAL */
-        .gen-overlay{position:fixed;inset:0;z-index:100;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .25s;}
-        .gen-overlay.show{opacity:1;pointer-events:all;}
-        .gen-modal{background:var(--white);border-radius:var(--radius-xl);padding:36px 36px 32px;width:100%;max-width:520px;box-shadow:0 32px 80px rgba(15,23,42,.22);transform:translateY(16px);transition:transform .3s cubic-bezier(.22,1,.36,1);}
-        .gen-overlay.show .gen-modal{transform:none;}
-        .gen-modal-top{text-align:center;margin-bottom:30px;}
-        .gen-spinner-wrap{width:64px;height:64px;margin:0 auto 18px;border-radius:18px;background:linear-gradient(135deg,var(--indigo-50),#e6f4fe);display:flex;align-items:center;justify-content:center;}
-        .gen-spinner{width:30px;height:30px;border:3px solid var(--indigo-100);border-top-color:var(--indigo);border-radius:50%;animation:spin .75s linear infinite;}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        .gen-modal-top h3{font-size:1.1rem;font-weight:800;margin-bottom:6px;}
-        .gen-modal-top p{font-size:.875rem;color:var(--slate-500);}
-        .gen-steps{display:flex;flex-direction:column;gap:10px;margin-bottom:28px;}
-        .gen-step{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius);font-size:.875rem;font-weight:500;color:var(--slate-500);background:var(--slate-50);border:1.5px solid var(--slate-100);transition:all .3s;}
-        .gen-step.done{background:var(--success-bg);border-color:var(--success-border);color:#065F46;font-weight:600;}
-        .gen-step.active{background:var(--indigo-50);border-color:var(--indigo-100);color:var(--indigo);font-weight:600;}
-        .gen-step-icon{font-size:1rem;width:20px;text-align:center;flex-shrink:0;}
-        .gen-step-check{margin-left:auto;width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.65rem;}
-        .gen-step.done .gen-step-check{background:var(--success);color:white;}
-        .gen-step.active .gen-step-check{background:var(--indigo-100);}
-        .gen-progress-bar{height:6px;background:var(--slate-100);border-radius:99px;overflow:hidden;}
-        .gen-progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--indigo),var(--violet));transition:width .4s cubic-bezier(.22,1,.36,1);}
-
-        @media(max-width:1100px){.stats-grid{grid-template-columns:repeat(2,1fr);}.two-col{grid-template-columns:1fr;}.info-card{display:none;}}
-        @media(max-width:860px){.sidebar{position:fixed;left:-280px;transition:left .3s;}.sidebar.open{left:0;box-shadow:var(--shadow-lg);}.mobile-sidebar-toggle{display:flex;}.page-content{padding:20px 18px 40px;}.topbar{padding:0 18px;}}
-        @media(max-width:640px){.stats-grid{grid-template-columns:1fr 1fr;}.create-options{grid-template-columns:1fr;}.welcome-row{flex-direction:column;align-items:flex-start;}}
-      `}</style>
-
-      <div className="app">
-        {/* SIDEBAR */}
-        <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
-          <div className="sidebar-logo">
-            <div className="sidebar-logo-mark">✦</div>
-            Prepara Aula
-          </div>
-          <nav className="sidebar-nav">
-            <div className="sidebar-section-label">Principal</div>
-            <div className="nav-item active"><span className="nav-icon">🏠</span> Início</div>
-            <div className="nav-item"><span className="nav-icon">✨</span> Nova Aula <span className="nav-badge">IA</span></div>
-            <div className="nav-item"><span className="nav-icon">📁</span> Minhas Aulas</div>
-            <div className="sidebar-divider"></div>
-            <div className="sidebar-section-label">Ferramentas</div>
-            <div className="nav-item"><span className="nav-icon">📊</span> Slides</div>
-            <div className="nav-item"><span className="nav-icon">📋</span> Planos de Aula</div>
-            <div className="nav-item"><span className="nav-icon">📝</span> Exercícios</div>
-            <div className="nav-item"><span className="nav-icon">🎙️</span> Roteiros</div>
-            <div className="sidebar-divider"></div>
-            <div className="sidebar-section-label">Conta</div>
-            <div className="nav-item"><span className="nav-icon">💳</span> Plano & Assinatura</div>
-            <div className="nav-item" onClick={async () => { await supabase.auth.signOut(); router.push('/login') }}>
-              <span className="nav-icon">🚪</span> Sair
+  const renderConteudo = () => {
+    if (activeNav === 'nova-aula' || activeNav === 'inicio') {
+      return (
+        <>
+          {/* Saudação */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
+            <div>
+              <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0f2b5b', margin: 0 }}>
+                {getHoraSaudacao()}, {nomeAbreviado} 👋
+              </h1>
+              <p style={{ color: '#94a3b8', marginTop: 4, fontSize: 14 }}>
+                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · Plano {nomePlano}
+              </p>
             </div>
-          </nav>
-          <div className="sidebar-bottom">
-            <div className="user-chip">
-              <div className="user-avatar">{iniciais}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div className="user-name">{nomeUsuario}</div>
-                <div className="user-plan">Plano {planoNome}</div>
-              </div>
-              <svg style={{color:'rgba(255,255,255,.3)',flexShrink:0}} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-          </div>
-        </aside>
-
-        {/* MAIN */}
-        <div className="main-col">
-          <header className="topbar">
-            <button className="mobile-sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            <button
+              onClick={() => setActiveNav('nova-aula')}
+              style={{
+                background: 'linear-gradient(135deg, #152664, #1a56db)',
+                color: 'white', border: 'none', borderRadius: 12,
+                padding: '12px 24px', fontWeight: 700, fontSize: 14,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                boxShadow: '0 4px 16px rgba(21,38,100,0.25)'
+              }}
+            >
+              + Nova aula
             </button>
-            <div className="search-wrap">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input className="search-input" type="text" placeholder="Buscar aulas, disciplinas..."/>
-            </div>
-            <div className="topbar-spacer"></div>
-            <div className="topbar-actions">
-              <button className="icon-btn">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                <span className="notif-dot"></span>
-              </button>
-              <button className="icon-btn">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              </button>
-              <div className="topbar-avatar">{iniciais}</div>
-            </div>
-          </header>
+          </div>
 
-          <div className="page-content">
-            {/* Welcome */}
-            <div className="welcome-row">
-              <div className="welcome-text">
-                <h1>Bom dia, {nomeUsuario.split(' ')[0]} 👋</h1>
-                <p>{new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · Plano {planoNome}</p>
-              </div>
-              <button className="btn-new-lesson" onClick={openGenModal}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Nova aula
-              </button>
-            </div>
-
-            {/* Stats */}
-            <div className="stats-grid">
+          {/* Stats — apenas se tiver aulas criadas */}
+          {aulas.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 32 }}>
               {[
-                {icon:'📊',bg:'si-indigo',val:'28',label:'Aulas criadas este mês',trend:'↑ 12%',tClass:'trend-up'},
-                {icon:'🖼️',bg:'si-violet',val:'463',label:'Slides gerados',trend:'↑ 8%',tClass:'trend-up'},
-                {icon:'⏱️',bg:'si-green',val:'56h',label:'Horas economizadas',trend:'↑ 94%',tClass:'trend-up'},
-                {icon:'📝',bg:'si-amber',val:'140',label:'Exercícios gerados',trend:'= igual',tClass:'trend-same'},
-              ].map((s,i) => (
-                <div key={i} className="stat-card">
-                  <div className="stat-card-top">
-                    <div className={`stat-icon ${s.bg}`}>{s.icon}</div>
-                    <div className={`stat-trend ${s.tClass}`}>{s.trend}</div>
-                  </div>
-                  <div className="stat-value">{s.val}</div>
-                  <div className="stat-label">{s.label}</div>
+                { label: 'Aulas criadas este mês', value: stats.aulasMes, icon: '📊', cor: '#3b82f6' },
+                { label: 'Slides gerados', value: stats.slidesGerados, icon: '🖼️', cor: '#8b5cf6' },
+                { label: 'Horas economizadas', value: `${stats.horasEconomizadas}h`, icon: '⏱️', cor: '#10b981' },
+                { label: 'Exercícios gerados', value: stats.exerciciosGerados, icon: '📝', cor: '#f59e0b' },
+              ].map((s, i) => (
+                <div key={i} style={{
+                  background: 'white', borderRadius: 16, padding: '20px 22px',
+                  border: '1px solid #e8eef8', boxShadow: '0 2px 12px rgba(21,38,100,0.05)'
+                }}>
+                  <div style={{ fontSize: 24, marginBottom: 10 }}>{s.icon}</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: '#0f2b5b' }}>{s.value}</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>{s.label}</div>
                 </div>
               ))}
             </div>
+          )}
 
-            {/* Two-col */}
-            <div className="two-col">
-              {/* Create box */}
-              <div className="create-card">
-                <div className="create-card-head">
-                  <div>
-                    <h2>✨ Nova aula com IA</h2>
-                    <p>Descreva sua aula e deixe a IA fazer o resto.</p>
-                  </div>
-                </div>
-                <div className="create-body">
-                  <div className="prompt-area">
-                    <div className="prompt-label">Descreva sua aula</div>
-                    <textarea
-                      className="prompt-textarea"
-                      value={prompt}
-                      onChange={e => setPrompt(e.target.value)}
-                      placeholder="Ex: Sistema circulatório para o 8º ano do ensino fundamental, 50 minutos. Turma participativa, gosto de perguntas interativas..."
-                    />
-                  </div>
-                  <div className="create-options">
-                    <div>
-                      <div className="create-opt-label">Disciplina</div>
-                      <select className="create-opt-select" value={disciplina} onChange={e => setDisciplina(e.target.value)}>
-                        {['Ciências','Biologia','História','Matemática','Português','Geografia','Física','Química'].map(d => <option key={d}>{d}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <div className="create-opt-label">Turma / Série</div>
-                      <select className="create-opt-select" value={turma} onChange={e => setTurma(e.target.value)}>
-                        {['6º ano — EF','7º ano — EF','8º ano — EF','9º ano — EF','1º ano — EM','2º ano — EM','3º ano — EM'].map(t => <option key={t}>{t}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <div className="create-opt-label">Duração</div>
-                      <select className="create-opt-select" value={duracao} onChange={e => setDuracao(e.target.value)}>
-                        {['45 minutos','50 minutos','90 minutos','100 minutos','2 aulas'].map(d => <option key={d}>{d}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="create-footer">
-                    <div className="create-chips">
-                      <span className="chip chip-filled">📊 Slides</span>
-                      <span className="chip chip-filled">📋 Plano BNCC</span>
-                      <span className="chip chip-filled">🎙️ Roteiro</span>
-                      <span className="chip chip-outline">📝 Exercícios</span>
-                    </div>
-                    <button className="btn-generate" onClick={openGenModal}>⚡ Gerar aula</button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Info card */}
-              <div className="info-card">
-                <div className="info-card-head"><h2>Uso do plano</h2><p>Ciclo atual · Renova em 1º de abril</p></div>
-                <div className="plan-usage">
-                  <div className="usage-row">
-                    <span className="usage-label">Aulas criadas</span>
-                    <span className="usage-count"><strong>{aulasUsadas}</strong> / {aulasTotal}</span>
-                  </div>
-                  <div className="usage-bar">
-                    <div className="usage-fill" style={{width:`${Math.min((aulasUsadas/aulasTotal)*100,100)}%`}}></div>
-                  </div>
-                </div>
-                <div className="plan-chip-row">
-                  <span className="plan-name-chip">{planoNome}</span>
-                  <a href="/planos" className="plan-upgrade">Fazer upgrade →</a>
-                </div>
-                <div className="info-divider"></div>
-                <div className="info-card-head"><h2>Dicas rápidas</h2><p>Para melhores resultados</p></div>
-                <div className="tips-list">
-                  {[
-                    {icon:'✍️',bg:'ti-blue',t:'Seja específico no prompt',s:'Mencione tema, turma, tempo e objetivos da aula.'},
-                    {icon:'🎯',bg:'ti-green',t:'Informe o estilo da turma',s:'Ex: "turma tímida" ou "gostam de debates".'},
-                    {icon:'💡',bg:'ti-amber',t:'Inclua a BNCC desejada',s:'Cite a habilidade (EF08CI08) para mais precisão.'},
-                  ].map((tip,i) => (
-                    <div key={i} className="tip-item">
-                      <div className={`tip-icon ${tip.bg}`}>{tip.icon}</div>
-                      <div className="tip-text"><strong>{tip.t}</strong><span>{tip.s}</span></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          {/* Barra de uso do plano */}
+          <div style={{
+            background: 'white', borderRadius: 16, padding: '20px 24px',
+            border: '1px solid #e8eef8', marginBottom: 28,
+            boxShadow: '0 2px 12px rgba(21,38,100,0.05)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+              <span style={{ fontWeight: 600, color: '#0f2b5b', fontSize: 14 }}>Uso do plano este mês</span>
+              <span style={{ fontSize: 13, color: '#94a3b8' }}>{stats.aulasUsadas} / {stats.limitesMes} aulas</span>
             </div>
-
-            {/* Lessons table */}
-            <div className="lessons-card">
-              <div className="lessons-head">
-                <h2>Aulas recentes</h2>
-                <div className="lessons-filters">
-                  {['Todas','Concluídas','Rascunhos'].map(f => (
-                    <button key={f} className={`filter-btn${filter===f?' active':''}`} onClick={() => setFilter(f)}>{f}</button>
-                  ))}
-                </div>
-              </div>
-              <table className="lessons-table">
-                <thead>
-                  <tr><th>Aula</th><th>Status</th><th>Slides</th><th>Criada em</th><th></th></tr>
-                </thead>
-                <tbody>
-                  {aulasFiltradas.map((a,i) => (
-                    <tr key={i}>
-                      <td>
-                        <div className="lesson-subject">
-                          <div className="lesson-icon" style={{background:a.bg}}>{a.icon}</div>
-                          <div><div className="lesson-name">{a.nome}</div><div className="lesson-grade">{a.info}</div></div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`badge-status ${a.status==='done'?'bs-done':a.status==='editing'?'bs-editing':'bs-draft'}`}>
-                          ● {a.status==='done'?'Concluída':a.status==='editing'?'Editando':'Rascunho'}
-                        </span>
-                      </td>
-                      <td><span className="lesson-meta">{a.slides}</span></td>
-                      <td><span className="lesson-meta">{a.data}</span></td>
-                      <td>
-                        <div className="row-actions">
-                          {[
-                            <svg key="e" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
-                            <svg key="d" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
-                            <svg key="m" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>,
-                          ].map((icon,j) => <button key={j} className="row-btn">{icon}</button>)}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="lessons-footer">
-                <span>Exibindo {aulasFiltradas.length} de 28 aulas</span>
-                <button className="btn-see-all">Ver todas as aulas →</button>
-              </div>
+            <div style={{ background: '#f1f5f9', borderRadius: 100, height: 8, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 100,
+                background: stats.aulasUsadas / stats.limitesMes > 0.8
+                  ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
+                  : 'linear-gradient(90deg, #152664, #1a56db)',
+                width: `${Math.min((stats.aulasUsadas / stats.limitesMes) * 100, 100)}%`,
+                transition: 'width 0.5s ease'
+              }} />
             </div>
+            {stats.aulasUsadas >= stats.limitesMes && (
+              <p style={{ fontSize: 12, color: '#ef4444', marginTop: 8, fontWeight: 600 }}>
+                ⚠️ Limite atingido. <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => router.push('/planos')}>Fazer upgrade →</span>
+              </p>
+            )}
           </div>
-        </div>
-      </div>
 
-      {/* GENERATION MODAL */}
-      <div className={`gen-overlay${genModal?' show':''}`} onClick={e => { if(genDone && e.target.classList.contains('gen-overlay')) setGenModal(false) }}>
-        <div className="gen-modal">
-          <div className="gen-modal-top">
-            <div className="gen-spinner-wrap">
-              {genDone
-                ? <div style={{fontSize:'2rem'}}>🎉</div>
-                : <div className="gen-spinner"></div>
-              }
+          {/* Formulário de geração */}
+          <div style={{
+            background: 'white', borderRadius: 20, padding: 28,
+            border: '1px solid #e8eef8', marginBottom: 32,
+            boxShadow: '0 2px 12px rgba(21,38,100,0.05)'
+          }}>
+            <div style={{ marginBottom: 20 }}>
+              <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0f2b5b', margin: '0 0 4px' }}>
+                ✦ Nova aula com IA
+              </h2>
+              <p style={{ fontSize: 13, color: '#94a3b8', margin: 0 }}>Descreva sua aula e deixe a IA fazer o resto.</p>
             </div>
-            <h3>{genDone ? 'Aula criada com sucesso!' : 'Gerando sua aula com IA...'}</h3>
-            <p>{genDone ? 'Seus slides, plano de aula, roteiro e exercícios estão prontos.' : 'Aguarde enquanto a IA prepara tudo para você.'}</p>
-          </div>
-          <div className="gen-steps">
-            {STEPS.map((s,i) => (
-              <div key={i} className={`gen-step${doneSteps.includes(i)?' done':activeStep===i?' active':''}`}>
-                <span className="gen-step-icon">{s.icon}</span>
-                <span>{s.label}</span>
-                <div className="gen-step-check">{doneSteps.includes(i) ? '✓' : ''}</div>
+
+            <div style={{ position: 'relative', marginBottom: 16 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94a3b8', display: 'block', marginBottom: 8 }}>
+                DESCREVA SUA AULA
+              </label>
+              <textarea
+                placeholder="Ex: Sistema circulatório para o 8º ano do ensino fundamental, 50 minutos. Turma participativa, gosto de perguntas interativas..."
+                value={form.descricao}
+                onChange={e => setForm({ ...form, descricao: e.target.value })}
+                rows={4}
+                style={{
+                  width: '100%', padding: '14px 16px',
+                  border: '1.5px solid #e2e8f0', borderRadius: 12,
+                  fontSize: 14, outline: 'none', resize: 'vertical',
+                  fontFamily: 'sans-serif', color: '#374151',
+                  boxSizing: 'border-box', lineHeight: 1.6,
+                  transition: 'border-color 0.2s'
+                }}
+                onFocus={e => e.target.style.borderColor = '#1a56db'}
+                onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 20 }}>
+              {/* Disciplina */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>Disciplina</label>
+                <select
+                  value={form.disciplina}
+                  onChange={e => setForm({ ...form, disciplina: e.target.value })}
+                  style={selectStyle}
+                >
+                  <optgroup label="── Ensino Básico ──" disabled />
+                  {DISCIPLINAS.slice(0, 15).map(d => <option key={d}>{d}</option>)}
+                  <optgroup label="── Ensino Superior ──" disabled />
+                  {DISCIPLINAS.slice(15).map(d => <option key={d}>{d}</option>)}
+                </select>
               </div>
+
+              {/* Turma */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>Turma / Série</label>
+                <select
+                  value={form.turma}
+                  onChange={e => setForm({ ...form, turma: e.target.value })}
+                  style={selectStyle}
+                >
+                  {TURMAS.map(grupo => (
+                    <optgroup key={grupo.grupo} label={`── ${grupo.grupo} ──`}>
+                      {grupo.opcoes.map(o => <option key={o}>{o}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              {/* Duração */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>Duração</label>
+                <select
+                  value={form.duracao}
+                  onChange={e => setForm({ ...form, duracao: e.target.value })}
+                  style={selectStyle}
+                >
+                  {DURACOES.map(d => <option key={d}>{d}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Chips do que será gerado */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[
+                  { label: 'Slides', icon: '📊' },
+                  { label: 'Plano BNCC', icon: '📋' },
+                  { label: 'Roteiro', icon: '🎙️' },
+                  { label: 'Exercícios', icon: '📝' },
+                ].map(c => (
+                  <div key={c.label} style={{
+                    background: '#eff6ff', color: '#1a56db',
+                    borderRadius: 100, padding: '5px 12px',
+                    fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5
+                  }}>
+                    {c.icon} {c.label}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={handleGerarAula}
+                disabled={gerando || stats.aulasUsadas >= stats.limitesMes}
+                style={{
+                  background: gerando || stats.aulasUsadas >= stats.limitesMes
+                    ? '#94a3b8'
+                    : 'linear-gradient(135deg, #152664, #1a56db)',
+                  color: 'white', border: 'none', borderRadius: 12,
+                  padding: '12px 28px', fontWeight: 700, fontSize: 14,
+                  cursor: gerando ? 'wait' : stats.aulasUsadas >= stats.limitesMes ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  boxShadow: gerando ? 'none' : '0 4px 16px rgba(21,38,100,0.25)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {gerando ? '⟳ Gerando...' : '⚡ Gerar aula'}
+              </button>
+            </div>
+
+            {/* Barra de progresso */}
+            {gerando && (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, color: '#64748b' }}>
+                    {progresso < 30 ? '🤖 Analisando o contexto...'
+                      : progresso < 60 ? '📊 Criando os slides...'
+                        : progresso < 85 ? '📋 Montando o plano de aula...'
+                          : '✅ Finalizando...'}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>{Math.round(progresso)}%</span>
+                </div>
+                <div style={{ background: '#f1f5f9', borderRadius: 100, height: 6, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 100,
+                    background: 'linear-gradient(90deg, #152664, #1a56db)',
+                    width: `${progresso}%`,
+                    transition: 'width 0.4s ease'
+                  }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Lista de aulas recentes */}
+          {aulas.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0f2b5b', margin: 0 }}>
+                  Aulas recentes
+                </h2>
+                <button
+                  onClick={() => setActiveNav('minhas-aulas')}
+                  style={{ fontSize: 13, color: '#1a56db', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Ver todas →
+                </button>
+              </div>
+              <TabelaAulas
+                aulas={aulas.slice(0, 5)}
+                router={router}
+                icones={iconesDisciplina}
+                formatarData={formatarData}
+              />
+            </div>
+          )}
+
+          {aulas.length === 0 && (
+            <div style={{
+              background: 'white', borderRadius: 20, padding: 64,
+              textAlign: 'center', border: '2px dashed #e2e8f0'
+            }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>📝</div>
+              <h3 style={{ color: '#0f2b5b', marginBottom: 8, fontSize: 18 }}>Nenhuma aula ainda</h3>
+              <p style={{ color: '#94a3b8', fontSize: 14 }}>Descreva sua aula acima e clique em <strong>Gerar aula</strong> para começar!</p>
+            </div>
+          )}
+        </>
+      )
+    }
+
+    if (activeNav === 'minhas-aulas') {
+      return (
+        <>
+          <div style={{ marginBottom: 24 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f2b5b', margin: '0 0 4px' }}>Minhas Aulas</h1>
+            <p style={{ color: '#94a3b8', fontSize: 13 }}>{aulas.length} aula{aulas.length !== 1 ? 's' : ''} criada{aulas.length !== 1 ? 's' : ''}</p>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="Buscar aulas, disciplinas..."
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              style={{
+                flex: 1, minWidth: 200, padding: '10px 16px',
+                border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 14, outline: 'none'
+              }}
+            />
+            {['todas', 'concluidas', 'rascunhos'].map(f => (
+              <button key={f}
+                onClick={() => setFiltro(f)}
+                style={{
+                  padding: '10px 18px', borderRadius: 10, border: 'none',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  background: filtro === f ? '#152664' : '#f1f5f9',
+                  color: filtro === f ? 'white' : '#64748b',
+                }}
+              >
+                {f === 'todas' ? 'Todas' : f === 'concluidas' ? 'Concluídas' : 'Rascunhos'}
+              </button>
             ))}
           </div>
-          <div className="gen-progress-bar">
-            <div className="gen-progress-fill" style={{width:`${progress}%`}}></div>
+
+          {aulasFiltradas.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 64, color: '#94a3b8' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+              <p>Nenhuma aula encontrada</p>
+            </div>
+          ) : (
+            <TabelaAulas
+              aulas={aulasFiltradas}
+              router={router}
+              icones={iconesDisciplina}
+              formatarData={formatarData}
+            />
+          )}
+        </>
+      )
+    }
+
+    // Slides, Planos de Aula, Exercícios, Roteiros — filtram das aulas existentes
+    const secoes = {
+      slides: { titulo: 'Slides', icon: '▤', desc: 'Apresentações geradas', campo: 'slides' },
+      'planos-aula': { titulo: 'Planos de Aula', icon: '☰', desc: 'Planos com BNCC', campo: 'plano_aula' },
+      exercicios: { titulo: 'Exercícios', icon: '✎', desc: 'Exercícios e gabaritos', campo: 'exercicios' },
+      roteiros: { titulo: 'Roteiros', icon: '⚑', desc: 'Roteiros do professor', campo: 'atividade' },
+    }
+
+    if (secoes[activeNav]) {
+      const sec = secoes[activeNav]
+      const aulasComConteudo = aulas.filter(a => a[sec.campo])
+      return (
+        <>
+          <div style={{ marginBottom: 24 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f2b5b', margin: '0 0 4px' }}>
+              {sec.icon} {sec.titulo}
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: 13 }}>{sec.desc} · {aulasComConteudo.length} item{aulasComConteudo.length !== 1 ? 's' : ''}</p>
+          </div>
+
+          {aulasComConteudo.length === 0 ? (
+            <div style={{
+              background: 'white', borderRadius: 20, padding: 64,
+              textAlign: 'center', border: '2px dashed #e2e8f0'
+            }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
+              <p style={{ color: '#94a3b8' }}>Nenhum conteúdo ainda.<br />Gere uma aula para ver aqui.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {aulasComConteudo.map(aula => (
+                <div
+                  key={aula.id}
+                  onClick={() => router.push(`/aula/${aula.id}`)}
+                  style={{
+                    background: 'white', borderRadius: 14,
+                    padding: '18px 22px', cursor: 'pointer',
+                    border: '1px solid #e8eef8',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    transition: 'box-shadow 0.2s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 20px rgba(21,38,100,0.1)'}
+                  onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 10,
+                      background: '#eff6ff', fontSize: 18,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      {iconesDisciplina[aula.disciplina] || '📖'}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#0f2b5b', fontSize: 14 }}>{aula.titulo || aula.tema}</div>
+                      <div style={{ fontSize: 12, color: '#94a3b8' }}>{aula.disciplina} · {aula.nivel} · {aula.duracao}</div>
+                    </div>
+                  </div>
+                  <span style={{ color: '#1a56db', fontSize: 18 }}>→</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )
+    }
+
+    if (activeNav === 'plano') {
+      return (
+        <>
+          <div style={{ marginBottom: 28 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f2b5b', margin: 0 }}>Plano & Assinatura</h1>
+          </div>
+          <div style={{
+            background: 'white', borderRadius: 20, padding: 32,
+            border: '1px solid #e8eef8', maxWidth: 500
+          }}>
+            <div style={{ fontSize: 14, color: '#64748b', marginBottom: 8 }}>Plano atual</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#0f2b5b', marginBottom: 4 }}>{nomePlano}</div>
+            <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 24 }}>
+              {stats.aulasUsadas} de {stats.limitesMes} aulas usadas este mês
+            </div>
+            <a
+              href="/planos"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: 'linear-gradient(135deg, #152664, #1a56db)',
+                color: 'white', borderRadius: 10, padding: '12px 24px',
+                fontWeight: 700, fontSize: 14, textDecoration: 'none'
+              }}
+            >
+              Ver planos e fazer upgrade →
+            </a>
+          </div>
+        </>
+      )
+    }
+
+    return null
+  }
+
+  const selectStyle = {
+    width: '100%', padding: '10px 14px',
+    border: '1.5px solid #e2e8f0', borderRadius: 10,
+    fontSize: 14, outline: 'none', background: 'white',
+    color: '#374151', cursor: 'pointer', boxSizing: 'border-box'
+  }
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#f4f7ff', fontFamily: "'Mulish', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;500;600;700;800&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(21,38,100,0.15); border-radius: 4px; }
+      `}</style>
+
+      {/* SIDEBAR */}
+      <aside style={{
+        width: 224, background: '#152664', minHeight: '100vh',
+        display: 'flex', flexDirection: 'column',
+        position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 100
+      }}>
+        {/* Logo */}
+        <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 32, height: 32, background: 'rgba(203,231,254,0.15)',
+              borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M20 3C14 5 10 11 7 16C6 18 5 21 5 21C7 19 9 18 11 17.5C11 17.5 10 14 14 10C17 7 20 3 20 3Z" fill="#cbe7fe" />
+              </svg>
+            </div>
+            <span style={{ fontSize: 16, fontWeight: 800, color: 'white', letterSpacing: '-0.01em' }}>Prepara Aula</span>
           </div>
         </div>
+
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '16px 12px', overflowY: 'auto' }}>
+          {navItems.map((item, i) => {
+            const isSection = item.section
+            const prevItem = navItems[i - 1]
+            const showSection = isSection && (!prevItem || prevItem.section !== item.section)
+
+            return (
+              <div key={item.id}>
+                {showSection && (
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, letterSpacing: '0.12em',
+                    color: 'rgba(255,255,255,0.3)', padding: '16px 8px 8px',
+                    textTransform: 'uppercase'
+                  }}>
+                    {item.section}
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    if (item.id === 'sair') { handleLogout(); return }
+                    setActiveNav(item.id)
+                  }}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '9px 10px', borderRadius: 9, border: 'none',
+                    background: activeNav === item.id ? 'rgba(255,255,255,0.12)' : 'transparent',
+                    color: activeNav === item.id ? 'white' : 'rgba(255,255,255,0.55)',
+                    fontSize: 13.5, fontWeight: activeNav === item.id ? 700 : 500,
+                    cursor: 'pointer', marginBottom: 2,
+                    transition: 'all 0.15s', textAlign: 'left'
+                  }}
+                  onMouseEnter={e => { if (activeNav !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+                  onMouseLeave={e => { if (activeNav !== item.id) e.currentTarget.style.background = 'transparent' }}
+                >
+                  <span style={{ fontSize: 15, width: 18, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  {item.badge && (
+                    <span style={{
+                      background: '#1a56db', color: 'white',
+                      fontSize: 10, fontWeight: 700, padding: '2px 7px',
+                      borderRadius: 100, letterSpacing: '0.05em'
+                    }}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )
+          })}
+        </nav>
+
+        {/* Usuário */}
+        <div style={{
+          padding: '16px 16px', borderTop: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', alignItems: 'center', gap: 10
+        }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 50%,
+            background: 'rgba(203,231,254,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 700, color: '#cbe7fe', flexShrink: 0
+          }}>
+            {iniciais}
+          </div>
+          <div style={{ overflow: 'hidden' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {usuario?.nome || 'Professor'}
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Plano {nomePlano}</div>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN */}
+      <main style={{ flex: 1, marginLeft: 224, minHeight: '100vh' }}>
+        {/* Topbar */}
+        <header style={{
+          background: 'white', height: 64, padding: '0 32px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          borderBottom: '1px solid #e8eef8', position: 'sticky', top: 0, zIndex: 50
+        }}>
+          <div style={{ position: 'relative', flex: 1, maxWidth: 400 }}>
+            <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 15 }}>🔍</span>
+            <input
+              type="text"
+              placeholder="Buscar aulas, disciplinas..."
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              onFocus={() => { if (busca) setActiveNav('minhas-aulas') }}
+              style={{
+                width: '100%', height: 40, paddingLeft: 40, paddingRight: 16,
+                border: '1.5px solid #e8eef8', borderRadius: 10,
+                fontSize: 14, outline: 'none', background: '#f8faff'
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{
+              background: '#eff6ff', color: '#1a56db',
+              borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700
+            }}>
+              {stats.aulasUsadas}/{stats.limitesMes} aulas
+            </div>
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: '#152664', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, fontWeight: 700, color: 'white', cursor: 'pointer'
+            }}>
+              {iniciais}
+            </div>
+          </div>
+        </header>
+
+        {/* Conteúdo */}
+        <div style={{ padding: '32px 36px', maxWidth: 1100 }}>
+          {renderConteudo()}
+        </div>
+      </main>
+    </div>
+  )
+}
+
+function TabelaAulas({ aulas, router, icones, formatarData }) {
+  return (
+    <div style={{
+      background: 'white', borderRadius: 16,
+      border: '1px solid #e8eef8', overflow: 'hidden'
+    }}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 120px 80px 160px 90px',
+        padding: '10px 22px', borderBottom: '1px solid #f1f5f9'
+      }}>
+        {['AULA', 'STATUS', 'SLIDES', 'CRIADA EM', ''].map((h, i) => (
+          <div key={i} style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#94a3b8', textTransform: 'uppercase' }}>
+            {h}
+          </div>
+        ))}
       </div>
+      {aulas.map((aula, i) => {
+        let qtdSlides = 0
+        try { const s = JSON.parse(aula.slides || '[]'); qtdSlides = Array.isArray(s) ? s.length : 0 } catch {}
+        const status = aula.status || 'concluida'
+        const statusCor = { concluida: '#10b981', rascunho: '#f59e0b', editando: '#3b82f6' }[status] || '#10b981'
+        const statusLabel = { concluida: 'Concluída', rascunho: 'Rascunho', editando: 'Editando' }[status] || 'Concluída'
+
+        return (
+          <div
+            key={aula.id}
+            onClick={() => router.push(`/aula/${aula.id}`)}
+            style={{
+              display: 'grid', gridTemplateColumns: '1fr 120px 80px 160px 90px',
+              padding: '14px 22px', cursor: 'pointer',
+              borderBottom: i < aulas.length - 1 ? '1px solid #f8faff' : 'none',
+              transition: 'background 0.15s'
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8faff'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 9, background: '#eff6ff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0
+              }}>
+                {icones[aula.disciplina] || '📖'}
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, color: '#0f2b5b', fontSize: 13.5 }}>{aula.titulo || aula.tema || 'Sem título'}</div>
+                <div style={{ fontSize: 12, color: '#94a3b8' }}>{aula.disciplina} · {aula.nivel} · {aula.duracao}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <span style={{
+                background: statusCor + '18', color: statusCor,
+                borderRadius: 100, padding: '3px 10px',
+                fontSize: 11, fontWeight: 700
+              }}>
+                ● {statusLabel}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', fontSize: 13, color: '#64748b', fontWeight: 600 }}>
+              {qtdSlides > 0 ? `${qtdSlides} slides` : '—'}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: '#94a3b8' }}>
+              {formatarData(aula.created_at)}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'flex-end' }}>
+              <span style={{ color: '#94a3b8', fontSize: 16, cursor: 'pointer' }} title="Editar">✎</span>
+              <span style={{ color: '#94a3b8', fontSize: 16, cursor: 'pointer' }} title="Baixar">↓</span>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
