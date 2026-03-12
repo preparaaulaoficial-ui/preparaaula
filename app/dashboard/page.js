@@ -771,7 +771,7 @@ export default function Dashboard() {
           display: 'flex', alignItems: 'center', gap: 10
         }}>
           <div style={{
-            width: 34, height: 34, borderRadius: 50%,
+            width: 34, height: 34, borderRadius: '50%',
             background: 'rgba(203,231,254,0.2)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 13, fontWeight: 700, color: '#cbe7fe', flexShrink: 0
