@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -81,6 +81,18 @@ const PLANOS = [
 ]
 
 export default function PlanosPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: '#94a3b8', fontFamily: 'sans-serif', fontSize: 14 }}>Carregando planos...</p>
+      </div>
+    }>
+      <PlanosConteudo />
+    </Suspense>
+  )
+}
+
+function PlanosConteudo() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [planoAtual, setPlanoAtual]   = useState('starter')
