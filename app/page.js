@@ -1,4 +1,8 @@
 export default function Home() {
+  const CAKTO_STARTER      = 'https://pay.cakto.com.br/zybn2t8_802724'
+  const CAKTO_PROFISSIONAL = 'https://pay.cakto.com.br/ay95nr9_802729'
+  const CAKTO_ESCOLA       = 'https://pay.cakto.com.br/9hsh5ar_802731'
+
   return (
     <>
       <style>{`
@@ -158,7 +162,6 @@ export default function Home() {
         }
       `}</style>
 
-      {/* NAV */}
       <nav>
         <a href="/" className="logo">
           <div className="logo-mark">
@@ -175,23 +178,19 @@ export default function Home() {
           <li><a href="#recursos">Recursos</a></li>
           <li><a href="#planos">Planos</a></li>
           <li><a href="/login">Entrar</a></li>
-          <li><a href="/planos" className="nav-btn">Começar agora →</a></li>
+          <li><a href={CAKTO_PROFISSIONAL} target="_blank" className="nav-btn">Começar agora →</a></li>
         </ul>
       </nav>
 
-      {/* HERO */}
       <section className="hero">
         <div className="blob b1"></div>
         <div className="blob b2"></div>
         <div className="hero-left">
-          <div className="hero-eyebrow">
-            <div className="eyebrow-dot"></div>
-            <span className="eyebrow-text">IA para Educadores Brasileiros</span>
-          </div>
+          <div className="hero-eyebrow"><div className="eyebrow-dot"></div><span className="eyebrow-text">IA para Educadores Brasileiros</span></div>
           <h1 className="hero-h1">Sua aula<br/><em>pronta</em><br/>em minutos.</h1>
           <p className="hero-sub">Descreva o tema, a turma e o tempo disponível — e a IA gera slides, plano de aula, roteiro do professor e exercícios alinhados à BNCC.</p>
           <div className="hero-actions">
-            <a href="/planos" className="btn-hero btn-hero-primary">Criar minha primeira aula →</a>
+            <a href={CAKTO_PROFISSIONAL} target="_blank" className="btn-hero btn-hero-primary">Criar minha primeira aula →</a>
             <a href="#como-funciona" className="btn-hero btn-hero-ghost">Como funciona</a>
           </div>
           <div className="hero-stats">
@@ -216,7 +215,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* TICKER */}
       <div className="ticker">
         <div className="ticker-inner">
           {['Matemática','Português','História','Geografia','Ciências','Biologia','Física','Química','Filosofia','Sociologia','Inglês','Artes','Educação Física','Matemática','Português','História','Geografia','Ciências','Biologia','Física','Química','Filosofia','Sociologia','Inglês','Artes','Educação Física'].map((s,i) => (
@@ -225,7 +223,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* COMO FUNCIONA */}
       <section className="sec" id="como-funciona">
         <div className="tag"><span className="tdot"></span> Como funciona</div>
         <h2 className="heading">Três passos para<br/><em>uma aula completa</em></h2>
@@ -237,7 +234,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* RECURSOS */}
       <section className="feat-sec" id="recursos">
         <div className="tag" style={{color:'var(--sky)',opacity:0.7}}><span className="tdot"></span> Recursos</div>
         <h2 className="heading hl">Tudo que o professor<br/><em>precisa, em um lugar</em></h2>
@@ -252,7 +248,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* DEPOIMENTOS */}
       <section className="test-sec">
         <div className="tag" style={{opacity:0.5}}><span className="tdot"></span> Depoimentos</div>
         <h2 className="heading">O que os professores<br/><em>estão dizendo</em></h2>
@@ -263,7 +258,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* PLANOS */}
       <section className="sec" id="planos">
         <div className="tag"><span className="tdot"></span> Planos</div>
         <h2 className="heading">Menos de <em>R$3</em><br/>por aula completa</h2>
@@ -280,7 +274,7 @@ export default function Home() {
               <li><span className="ck">✓</span> Exportação PowerPoint</li>
               <li><span className="ck">✓</span> Suporte por e-mail</li>
             </ul>
-            <a href="/planos" className="btn-p btn-po">Assinar Starter →</a>
+            <a href={CAKTO_STARTER} target="_blank" className="btn-p btn-po">Assinar Starter →</a>
           </div>
           <div className="price-card hi">
             <div className="pbadge">⭐ Mais popular</div>
@@ -295,7 +289,7 @@ export default function Home() {
               <li><span className="ck">✓</span> Edição de slides</li>
               <li><span className="ck">✓</span> Suporte prioritário</li>
             </ul>
-            <a href="/planos" className="btn-p btn-pf">Assinar Profissional →</a>
+            <a href={CAKTO_PROFISSIONAL} target="_blank" className="btn-p btn-pf">Assinar Profissional →</a>
           </div>
           <div className="price-card">
             <div className="pname">Escola</div><div className="pdesc">Para coordenadores e escolas inteiras</div>
@@ -310,12 +304,11 @@ export default function Home() {
               <li><span className="ck">✓</span> 6 paletas de cores</li>
               <li><span className="ck">✓</span> Suporte via WhatsApp</li>
             </ul>
-            <a href="/planos" className="btn-p btn-po">Assinar Escola →</a>
+            <a href={CAKTO_ESCOLA} target="_blank" className="btn-p btn-po">Assinar Escola →</a>
           </div>
         </div>
       </section>
 
-      {/* FAQ */}
       <section className="sec" id="faq" style={{background:'#f7f9ff',paddingTop:'80px',paddingBottom:'80px'}}>
         <div className="tag"><span className="tdot"></span> Dúvidas</div>
         <h2 className="heading">Perguntas<br/><em>frequentes</em></h2>
@@ -329,19 +322,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA FINAL */}
       <section className="cta-sec">
         <div className="cta-glow"></div>
         <div className="tag" style={{color:'var(--sky)',opacity:0.7,marginBottom:'20px',display:'flex',justifyContent:'center'}}><span className="tdot"></span> Comece hoje</div>
         <h2 className="heading hl" style={{margin:'0 auto 20px'}}>Comece hoje.<br/><em>Sua próxima aula</em><br/>em 3 minutos.</h2>
         <p className="subtext sl" style={{margin:'0 auto 48px',textAlign:'center'}}>Professores que usam IA preparam aulas melhores<br/>em muito menos tempo.</p>
         <div className="cta-actions">
-          <a href="/planos" className="btn-hero btn-hero-primary">Escolher meu plano →</a>
+          <a href={CAKTO_PROFISSIONAL} target="_blank" className="btn-hero btn-hero-primary">Escolher meu plano →</a>
           <a href="/login" className="btn-hero btn-hero-ghost">Já tenho conta</a>
         </div>
       </section>
 
-      {/* FOOTER */}
       <footer>
         <div className="footer-top">
           <div className="footer-brand">
@@ -367,8 +358,6 @@ export default function Home() {
             <div className="footer-col">
               <h5>Conta</h5>
               <a href="/login">Entrar</a>
-              <a href="/planos">Assinar</a>
-              <a href="/definir-senha">Alterar senha</a>
             </div>
             <div className="footer-col">
               <h5>Suporte</h5>
@@ -378,9 +367,9 @@ export default function Home() {
         </div>
         <div className="footer-bot">
           <span className="footer-copy">© 2026 Prepara Aula · Todos os direitos reservados</span>
-          <span className="footer-copy">Pagamentos via Cakto · Desenvolvido por Prepara Aula</span>
+          <span className="footer-copy">Pagamentos via Cakto · Desenvolvido com IA</span>
         </div>
       </footer>
     </>
-  );
+  )
 }
