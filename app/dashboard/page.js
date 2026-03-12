@@ -31,9 +31,15 @@ export default function Dashboard() {
     const { data: perfil } = await supabase
       .from('profiles').select('*').eq('id', user.id).single()
 
+    // Bloqueia acesso se não tem plano ativo
+    if (!perfil?.plano_ativo) {
+      router.push("/planos?msg=sem-acesso")
+      return
+    }
+
     setUsuario(perfil)
 
-    const limites = { starter: 20, profissional: 30, escola: 99999 }
+    const limites = { starter: 20, profissional: 35, escola: 60 }
     setLimiteMes(limites[perfil?.plano] || 20)
     setAulasMes(perfil?.aulas_mes || 0)
 
