@@ -70,7 +70,8 @@ export default function Dashboard() {
     recursos: [],
     perfil_turma: '',
     metodologia: '',
-    objetivo_aula: '',
+    objetivos_aula: [],   // multi-select
+    qtd_slides: 12,       // 6 a 20
   })
 
   useEffect(() => { carregarDados() }, [])
@@ -137,8 +138,8 @@ export default function Dashboard() {
           recursos_disponiveis: form.recursos,
           perfil_turma: form.perfil_turma,
           metodologia: form.metodologia,
-          objetivo_aula: form.objetivo_aula,
-          quantidade_slides: 14,
+          objetivo_aula: form.objetivos_aula.join(', '),
+          quantidade_slides: form.qtd_slides,
         })
       })
 
@@ -515,18 +516,27 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Objetivo da aula */}
+              {/* Objetivo da aula — MULTI-SELECT */}
               <div style={{background:'#f8faff',borderRadius:14,padding:'14px 16px',border:'1px solid #eef2ff'}}>
-                <label style={{fontSize:11,fontWeight:700,color:'#152664',display:'block',marginBottom:10,letterSpacing:'0.06em',textTransform:'uppercase'}}>
-                  🎯 Objetivo principal?
+                <label style={{fontSize:11,fontWeight:700,color:'#152664',display:'block',marginBottom:4,letterSpacing:'0.06em',textTransform:'uppercase'}}>
+                  🎯 Objetivo da aula?
                 </label>
+                <p style={{fontSize:11,color:'#94a3b8',marginBottom:10}}>Pode selecionar mais de um</p>
                 <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                  {['Introduzir o tema','Aprofundar conteúdo','Revisar para prova','Fixar aprendizado','Avaliar conhecimento'].map(o=>{
-                    const sel=form.objetivo_aula===o
+                  {['Introduzir o tema','Aprofundar conteúdo','Revisar para prova','Fixar aprendizado','Avaliar conhecimento','Motivar a turma'].map(o=>{
+                    const sel = form.objetivos_aula.includes(o)
                     return (
-                      <button key={o} onClick={()=>setForm({...form,objetivo_aula:sel?'':o})}
-                        style={{padding:'5px 11px',borderRadius:100,fontSize:12,fontWeight:600,cursor:'pointer',border:sel?'1.5px solid #1a56db':'1.5px solid #dde4f0',background:sel?'#152664':'white',color:sel?'white':'#64748b',transition:'all 0.15s'}}>
-                        {o}
+                      <button key={o}
+                        onClick={()=>setForm({...form, objetivos_aula: sel ? form.objetivos_aula.filter(x=>x!==o) : [...form.objetivos_aula, o]})}
+                        style={{
+                          padding:'5px 11px',borderRadius:100,fontSize:12,fontWeight:600,cursor:'pointer',
+                          border: sel ? '1.5px solid #1a56db' : '1.5px solid #dde4f0',
+                          background: sel ? '#152664' : 'white',
+                          color: sel ? 'white' : '#64748b',
+                          transition:'all 0.15s',
+                          display:'flex',alignItems:'center',gap:5,
+                        }}>
+                        {sel && <span style={{fontSize:10}}>✓</span>} {o}
                       </button>
                     )
                   })}
@@ -548,6 +558,48 @@ export default function Dashboard() {
                       </button>
                     )
                   })}
+                </div>
+              </div>
+
+              {/* Quantidade de slides — ocupa as 2 colunas */}
+              <div style={{background:'#f8faff',borderRadius:14,padding:'14px 16px',border:'1px solid #eef2ff',gridColumn:'1 / -1'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                  <div>
+                    <label style={{fontSize:11,fontWeight:700,color:'#152664',display:'block',letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:2}}>
+                      🖼️ Quantidade de slides
+                    </label>
+                    <p style={{fontSize:11,color:'#94a3b8',margin:0}}>Todos os planos suportam até 20 slides por aula</p>
+                  </div>
+                  <div style={{
+                    background:'#152664',color:'white',borderRadius:10,
+                    padding:'6px 16px',fontSize:18,fontWeight:900,minWidth:56,textAlign:'center',lineHeight:1.2
+                  }}>
+                    {form.qtd_slides}
+                    <div style={{fontSize:9,fontWeight:600,opacity:0.7,letterSpacing:'0.05em'}}>SLIDES</div>
+                  </div>
+                </div>
+                {/* Slider */}
+                <div style={{position:'relative',padding:'4px 0'}}>
+                  <input
+                    type="range" min={6} max={20} step={1}
+                    value={form.qtd_slides}
+                    onChange={e=>setForm({...form, qtd_slides: Number(e.target.value)})}
+                    style={{width:'100%',accentColor:'#152664',cursor:'pointer',height:4}}
+                  />
+                  <div style={{display:'flex',justifyContent:'space-between',marginTop:6}}>
+                    {[6,8,10,12,14,16,18,20].map(n=>(
+                      <button key={n}
+                        onClick={()=>setForm({...form,qtd_slides:n})}
+                        style={{
+                          padding:'3px 7px',borderRadius:6,fontSize:11,fontWeight:700,
+                          border: form.qtd_slides===n ? '1.5px solid #1a56db' : '1.5px solid #dde4f0',
+                          background: form.qtd_slides===n ? '#152664' : 'white',
+                          color: form.qtd_slides===n ? 'white' : '#94a3b8',
+                          cursor:'pointer',transition:'all 0.12s',
+                        }}
+                      >{n}</button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -583,9 +635,9 @@ export default function Dashboard() {
             {/* Footer do card — botão */}
             <div style={{padding:'16px 24px',background:'#f8faff',borderTop:'1px solid #eef2ff',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
               <div style={{fontSize:12,color:'#94a3b8'}}>
-                {[form.perfil_turma,form.metodologia,form.objetivo_aula,...form.recursos].filter(Boolean).length > 0
-                  ? <span style={{color:'#10b981',fontWeight:600}}>✓ {[form.perfil_turma,form.metodologia,form.objetivo_aula,...form.recursos].filter(Boolean).length} preferências selecionadas</span>
-                  : 'Selecione preferências para uma aula mais personalizada'
+                {[form.perfil_turma, form.metodologia, ...form.objetivos_aula, ...form.recursos].filter(Boolean).length > 0
+                  ? <span style={{color:'#10b981',fontWeight:600}}>✓ {[form.perfil_turma, form.metodologia, ...form.objetivos_aula, ...form.recursos].filter(Boolean).length} preferências · {form.qtd_slides} slides</span>
+                  : `${form.qtd_slides} slides · Selecione preferências para personalizar`
                 }
               </div>
               <button
