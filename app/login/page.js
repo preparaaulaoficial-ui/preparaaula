@@ -27,7 +27,7 @@ function LoginConteudo() {
     })
 
     if (error) {
-      setErro('Email ou senha incorretos.')
+      setErro(error.message)
       setLoading(false)
       return
     }
