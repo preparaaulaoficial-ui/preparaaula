@@ -402,9 +402,9 @@ function SlideDadoVisual({ s, p, num, total }) {
         <h2 style={{ fontFamily:"'Fraunces','Georgia',serif", fontWeight:700, fontSize:'clamp(13px,2vw,20px)', color:p.ink, letterSpacing:'-0.02em', lineHeight:1.15, margin:'0 0 clamp(10px,2vh,18px)' }}>{s.titulo}</h2>
         <div style={{ display:'flex', flexDirection:'column', gap:'clamp(6px,1.2vh,11px)' }}>
           {s.conteudo?.slice(1, 5).map((l, i) => (
-            <div key={i} style={{ padding:'clamp(7px,1.3vh,12px) clamp(9px,1.5vw,14px)', border:`1px solid ${p.ink}10`, borderRadius:2, background:'white' }}>
-              <div style={{ fontFamily:"'Fraunces','Georgia',serif", fontSize:'clamp(12px,2vw,20px)', fontWeight:700, color:p.ink, letterSpacing:'-0.02em', lineHeight:1 }}>{l.split(':')[0]}</div>
-              {l.includes(':') && <div style={{ fontSize:'clamp(7px,1vw,10px)', color:`${p.ink}55`, letterSpacing:'0.08em', textTransform:'uppercase', marginTop:2 }}>{l.split(':').slice(1).join(':').trim()}</div>}
+            <div key={i} style={{ padding:'clamp(6px,1.1vh,10px) clamp(9px,1.5vw,14px)', border:`1px solid ${p.ink}10`, borderRadius:2, background:'white', overflow:'hidden' }}>
+              <div style={{ fontFamily:"'Fraunces','Georgia',serif", fontSize:'clamp(11px,1.6vw,16px)', fontWeight:700, color:p.ink, letterSpacing:'-0.01em', lineHeight:1.15, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:1, WebkitBoxOrient:'vertical' }}>{l.split(':')[0]}</div>
+              {l.includes(':') && <div style={{ fontSize:'clamp(7px,0.9vw,9px)', color:`${p.ink}55`, marginTop:2, lineHeight:1.4, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>{l.split(':').slice(1).join(':').trim()}</div>}
             </div>
           ))}
         </div>
@@ -495,7 +495,7 @@ function SlideRevisao({ s, p, num, total }) {
           return (
             <div key={i} style={{ background:'white', border:`1px solid ${p.ink}10`, borderRadius:2, padding:'clamp(8px,1.5vh,14px) clamp(8px,1.2vw,12px)', display:'flex', flexDirection:'column', overflow:'hidden', position:'relative' }}>
               <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background:ac }} />
-              <div style={{ fontFamily:"'Fraunces','Georgia',serif", fontSize:'clamp(18px,3vw,32px)', fontWeight:900, color:`${p.ink}08`, lineHeight:1, marginBottom:4 }}>{String(i+1).padStart(2,'0')}</div>
+              <div style={{ fontFamily:"'Fraunces','Georgia',serif", fontSize:'clamp(18px,3vw,32px)', fontWeight:900, color:'rgba(0,0,0,0.06)', lineHeight:1, marginBottom:4 }}>{String(i+1).padStart(2,'0')}</div>
               <p style={{ fontSize:'clamp(8px,1.1vw,11px)', color:p.ink, lineHeight:1.55, margin:0, flex:1, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:4, WebkitBoxOrient:'vertical' }}>{texto}</p>
             </div>
           )
