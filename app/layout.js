@@ -19,6 +19,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <meta name="facebook-domain-verification" content="5f2incu6srrtkgaekezffyumb3zhkd" />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
         {children}
       </body>
